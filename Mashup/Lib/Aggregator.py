@@ -4,96 +4,70 @@
 import datetime
 import pandas as pd
 
-from Lib import LogHelper
 from Lib import CryptoTrack
 
-def getGroup()
 
-def aggrYear(logger, data, iscap, year):
-    ind = -1
-    newData = []
+def aggregate(data, type, aggr, stime, etime):
+    pddata = {"timestamp": [], "usd": [], aggr: [], "type": []}
 
-    while True:
-        ind += 1
-        curyear = int((logger._get_date(data[ind][0])).year)
-        if curyear == year:
+    for dpoint in data:
+        if dpoint[0] > stime and dpoint[0] < etime:
+            pddata["timestamp"].append(dpoint[0])
+            pddata["usd"].append(dpoint[1])
+            pddata["type"].append(type)
+
+            if aggr == "month":
+                pddata[aggr].append(getmonth(dpoint[0]))
+            elif aggr == "quarter":
+                pddata[aggr].append(getquarter(dpoint[0]))
+            else:
+                # default to year if neither month nor quarter
+                pddata[aggr].append(getyear(dpoint[0]))
+
+        if dpoint[0] > etime:
             break
 
-    while curyear == year:
-        newData.append(data[ind])
-        ind += 1
-        curyear = int((logger._get_date(data[ind][0])).year)
+    pddata = pd.DataFrame(pddata)
+    current = 0
+    curragg = pddata[aggr][current]
+    output = []
 
-    track = CryptoTrack.Tracker()
-    track.compute(newData)
+    while True:
+        pdcurr = pddata[pddata[aggr] == curragg]
+        track = CryptoTrack.Tracker(curragg, type)
+        track.compute(pdcurr["usd"], start=current)
+        output.append(track)
 
-    output = [str(year)]
-    if iscap:
-        output.append("market cap")
-    else
-        output.append("volume")
-    output.append(track.avg)
-    output.append(track.max)
-    output.append(track.min)
+        try:
+            while curragg == pddata[aggr][current]:
+                current += 1
+            curragg = pddata[aggr][current]
+        except LookupError:
+            break
 
     return output
 
 
-def aggrQuarter(logger, data, iscap, year, quarter):
-    ind = -1
-    newData = []
 
-    while True:
-        ind += 1
-        curyear = int((logger._get_date(data[ind][0])).year)
-        if curyear == year:
-            break
-
-    while curyear == year:
-        newData.append(data[ind])
-        ind += 1
-        curyear = int((logger._get_date(data[ind][0])).year)
-
-    track = CryptoTrack.Tracker()
-    track.compute(newData)
-
-    output = [str(year)]
-    if iscap:
-        output.append("market cap")
-    else
-        output.append("volume")
-    output.append(track.avg)
-    output.append(track.max)
-    output.append(track.min)
-
-    return output
+def getmonth(timestamp):
+    correct_timestamp = int(timestamp / 1000)
+    return datetime.datetime.fromtimestamp(correct_timestamp).strftime('%Y-%m')
 
 
-def aggrMonth(logger, data, iscap, year, month):
-    ind = -1
-    newData = []
+def getquarter(timestamp):
+    correct_timestamp = int(timestamp / 1000)
+    month = int(datetime.datetime.fromtimestamp(correct_timestamp).strftime('%m'))
+    year = datetime.datetime.fromtimestamp(correct_timestamp).strftime('%Y-')
 
-    while True:
-        ind += 1
-        curyear = int((logger._get_date(data[ind][0])).year)
-        if curyear == year:
-            break
+    if month < 4:
+        return year + 'Q1'
+    elif month < 7:
+        return year + 'Q2'
+    elif month < 10:
+        return year + 'Q3'
+    return year + 'Q4'
 
-    while curyear == year:
-        newData.append(data[ind])
-        ind += 1
-        curyear = int((logger._get_date(data[ind][0])).year)
 
-    track = CryptoTrack.Tracker()
-    track.compute(newData)
-
-    output = [str(year)]
-    if iscap:
-        output.append("market cap")
-    else
-        output.append("volume")
-    output.append(track.avg)
-    output.append(track.max)
-    output.append(track.min)
-
-    return output
+def getyear(timestamp):
+    correct_timestamp = int(timestamp / 1000)
+    return datetime.datetime.fromtimestamp(correct_timestamp).strftime('%Y')

@@ -53,7 +53,6 @@ class LogHelper(object):
         except Exception as e:
             print("LogHelper >> Info > " + str(e))
 
-
     def __getTimeStamp(self):
         try:
             return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -61,20 +60,22 @@ class LogHelper(object):
         except Exception as e:
             self.Error("LogHelper >> __getTimeStamp > " + str(e))
 
-    def _get_unix_timestamp(self, date_string):
-        try:
-            unix_time = time.mktime(datetime.datetime.strptime(date_string, "%Y-%m-%d").timetuple())
 
-            return int(unix_time) * 1000
+def _get_unix_timestamp(logger, date_string):
+    try:
+        unix_time = time.mktime(datetime.datetime.strptime(date_string, "%Y-%m-%d").timetuple())
 
-        except Exception as e:
-            self.Error('CoinCheckupAPI >> _get_unix_timestamp > ' + str(e))
+        return int(unix_time) * 1000
 
-    def _get_date(self, unix_timestamp: int) -> str:
-        try:
-            correct_timestamp = int(unix_timestamp / 1000)
+    except Exception as e:
+        logger.Error('CoinCheckupAPI >> _get_unix_timestamp > ' + str(e))
 
-            return datetime.datetime.fromtimestamp(correct_timestamp).strftime('%Y-%m-%d')
 
-        except Exception as e:
-            self.Error('CoinCheckupAPI >> _get_date > ' + str(e))
+def _get_date(logger, unix_timestamp: int) -> str:
+    try:
+        correct_timestamp = int(unix_timestamp / 1000)
+
+        return datetime.datetime.fromtimestamp(correct_timestamp).strftime('%Y-%m-%d')
+
+    except Exception as e:
+        logger.Error('CoinCheckupAPI >> _get_date > ' + str(e))

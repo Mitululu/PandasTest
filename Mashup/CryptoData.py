@@ -9,8 +9,10 @@ import os
 import sys
 import argparse
 import requests
+import json
 
-from Lib import LogHelper
+from Lib import LogHelper, Aggregator
+from Lib.LogHelper import _get_unix_timestamp
 
 
 def main():
@@ -18,9 +20,9 @@ def main():
 
     parser = argparse.ArgumentParser(description='Parse market data input')
     parser.add_argument('-s', '--startDate', action='store', dest="startDate",
-                        help="string start date in form %Y-%m-%d")
+                        help="string start date in form yyyy-mm-dd")
     parser.add_argument('-e', '--endDate', action='store', dest="endDate",
-                        help="string end date in form %Y-%m-%d")
+                        help="string end date in form yyyy-mm-dd")
     parser.add_argument('-w', '--write', action='store_true',
                         help="if set, write to the filepath instead of console")
     parser.add_argument('-f', "--filepath", action="store", dest="filepath",
@@ -39,8 +41,11 @@ def main():
     logger = LogHelper.LogHelper(logDir, "Mashup")
 
     try:
-        start = logger._get_unix_timestamp(args.startDate)
-        end = logger._get_unix_timestamp(args.endDate)
+        start = _get_unix_timestamp(logger, args.startDate)
+        end = _get_unix_timestamp(logger, args.endDate)
+        if start is None or end is None:
+            logger.Error("either start or end is not a proper date; recheck parameters")
+            sys.exit(99)
     except Exception as e:
         logger.Error("start and end date were not formatted properly: " + str(e))
         sys.exit(99)
@@ -54,22 +59,50 @@ def main():
             logger.Error("file being written to must be of type csv")
             sys.exit(99)
         try:
-            if not os.path.exists(args.filepath):
-                os.makedirs(args.filepath)
-            f = open(args.filepath, "r")
+            f = open(args.filepath, "w+")
             f.close()
         except Exception as e:
             logger.Error("%s is an invalid filepath; recheck parameters" % args.filepath)
             logger.Error("Error message: " + str(e))
             sys.exit(99)
 
-    print("Arg checks passed...")
-
     url = 'https://coincheckup.com/v2/graphs-prx/_mktcap/'\
           + str(start) + '/' + str(end) + '/'
-    jsonFile = requests.get(url)
+    try:
+        webfile = requests.get(url)
+    except Exception as e:
+        logger.Error("start and end dates did not yield proper results from "
+                     "coincheckup.com; error message follows\n" + e)
+        sys.exit(99)
 
-    for dic in jsonFile:
+    print("Argument checks passed...")
+
+    if args.aggr != "month" and args.aggr != "quarter":
+        args.aggr = "year"
+    cap = (json.loads((webfile.content).decode('utf-8')))["market_cap_by_available_supply"]
+    vol = (json.loads((webfile.content).decode('utf-8')))["volume_usd"]
+    outputcsv = "Period,Market Type,Min Trade,Max Trade,Avg Trade\n"
+
+    captrack = Aggregator.aggregate(cap, "market_cap", args.aggr, start, end)
+    voltrack = Aggregator.aggregate(vol, "volume_usd", args.aggr, start, end)
+    track = []
+
+    for i in range(len(captrack)):
+        track.append(captrack[i])
+        track.append(voltrack[i])
+
+    for x in track:
+        outputcsv += x.csvadd()
+
+    if not args.write:
+        print(outputcsv)
+    else:
+        with open(args.filepath, 'w') as f:
+            f.write(outputcsv)
+            print("Finished writing to " + args.filepath)
+
+    logger.Info("Crypto-market data written successfully")
+    print("Process complete; check the usage log for details")
 
 
 if __name__ == "__main__":
